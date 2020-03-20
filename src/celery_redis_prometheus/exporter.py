@@ -100,7 +100,7 @@ def task_handler(fn):
     return wrapper
 
 
-class CeleryEventReceiver:
+class CeleryEventReceiver(object):
 
     def __init__(self, app):
         self.app = app
@@ -155,7 +155,7 @@ class CeleryEventReceiver:
 class QueueLengthMonitor(threading.Thread):
 
     def __init__(self, app, interval):
-        super().__init__()
+        super(QueueLengthMonitor, self).__init__()
         self.app = app
         self.interval = interval
         self.running = True
