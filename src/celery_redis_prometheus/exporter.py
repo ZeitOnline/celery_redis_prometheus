@@ -1,5 +1,4 @@
 from functools import wraps
-import _thread
 import celery.bin.base
 import collections
 import json
@@ -7,6 +6,11 @@ import logging
 import prometheus_client
 import threading
 import time
+
+try:
+    import _thread
+except ImportError:  # py2
+    import thread as _thread
 
 
 log = logging.getLogger(__name__)
@@ -174,7 +178,8 @@ class QueueLengthMonitor(threading.Thread):
 
                 unacked = result.pop()
                 for task in unacked:
-                    *_, queue = json.loads(task.decode('utf-8'))
+                    data = json.loads(task.decode('utf-8'))
+                    queue = data[-1]
                     lengths[queue] += 1
 
                 for llen, queue in zip(result, self.app.conf['task_queues']):
