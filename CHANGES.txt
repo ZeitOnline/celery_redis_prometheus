@@ -1,7 +1,7 @@
 celery_redis_prometheus changes
 ===============================
 
-1.2.0 (unreleased)
+1.1.1 (2020-03-20)
 ------------------
 
 - Fix py2 class syntax issues
