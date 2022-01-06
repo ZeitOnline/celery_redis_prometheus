@@ -1,6 +1,6 @@
 prometheus-client==0.7.1
 
-celery==4.4.2
+celery==5.2.2
 amqp==2.5.2
 billiard==3.6.3.0
 kombu==4.6.8
