@@ -4,13 +4,9 @@ import collections
 import json
 import logging
 import prometheus_client
+import _thread
 import threading
 import time
-
-try:
-    import _thread
-except ImportError:  # py2
-    import thread as _thread
 
 
 log = logging.getLogger(__name__)
@@ -61,7 +57,7 @@ class Command(celery.bin.base.Command):
                 time.sleep(try_interval)
 
     def prepare_args(self, *args, **kw):
-        options, args = super(Command, self).prepare_args(*args, **kw)
+        options, args = super().prepare_args(*args, **kw)
         self.app.log.setup(
             logging.DEBUG if options.get('verbose') else logging.INFO)
 
@@ -100,7 +96,7 @@ def task_handler(fn):
     return wrapper
 
 
-class CeleryEventReceiver(object):
+class CeleryEventReceiver:
 
     def __init__(self, app):
         self.app = app
@@ -155,7 +151,7 @@ class CeleryEventReceiver(object):
 class QueueLengthMonitor(threading.Thread):
 
     def __init__(self, app, interval):
-        super(QueueLengthMonitor, self).__init__()
+        super().__init__()
         self.app = app
         self.interval = interval
         self.running = True
