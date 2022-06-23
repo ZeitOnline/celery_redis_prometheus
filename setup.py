@@ -16,7 +16,8 @@ setup(
     zip_safe=False,
     license='BSD',
     install_requires=[
-        'celery',
+        'celery >= 5.0.0.dev0',
+        'click',
         'prometheus_client',
         'setuptools',
     ],
@@ -25,7 +26,7 @@ setup(
     ]},
     entry_points={
         'celery.commands': [
-            'prometheus = celery_redis_prometheus.exporter:Command',
+            'prometheus = celery_redis_prometheus.exporter:main',
         ]
     }
 )

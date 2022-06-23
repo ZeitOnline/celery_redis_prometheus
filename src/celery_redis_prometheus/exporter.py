@@ -1,5 +1,6 @@
 from functools import wraps
 import celery.bin.base
+import click
 import collections
 import json
 import logging
@@ -30,61 +31,44 @@ STATS = {
 }
 
 
-class Command(celery.bin.base.Command):
+@click.command(name='prometheus', cls=celery.bin.base.CeleryCommand)
+@click.option('--host', default='0.0.0.0', help='Listen host')
+@click.option('--port', default=9691, help='Listen port')
+@click.option(
+    '--queuelength-interval', default=0,
+    help='Check queue lengths every x seconds (0=disabled)')
+@click.option('--verbose', is_flag=True, help='Enable debug logging')
+@click.pass_context
+def main(ctx, host, port, queuelength_interval, verbose):
+    app = ctx.obj.app
+    app.log.setup(logging.DEBUG if verbose else logging.INFO)
 
     queuelength_thread = None
+    if queuelength_interval:
+        queuelength_thread = QueueLengthMonitor(app, queuelength_interval)
+        queuelength_thread.start()
 
-    def run(self, **kw):
-        receiver = CeleryEventReceiver(self.app)
+    receiver = CeleryEventReceiver(app)
+    prometheus_client.start_http_server(port, host)
+    log.info('Listening on %s:%s', host, port)
 
-        try_interval = 1
-        while True:
-            try:
-                try_interval *= 2
-                receiver()
-                try_interval = 1
-            except (KeyboardInterrupt, SystemExit):
-                log.info('Exiting')
-                if self.queuelength_thread:
-                    self.queuelength_thread.stop()
-                _thread.interrupt_main()
-                break
-            except Exception as e:
-                log.error(
-                    'Failed to capture events: "%s", '
-                    'trying again in %s seconds.',
-                    e, try_interval, exc_info=True)
-                time.sleep(try_interval)
-
-    def prepare_args(self, *args, **kw):
-        options, args = super().prepare_args(*args, **kw)
-        self.app.log.setup(
-            logging.DEBUG if options.get('verbose') else logging.INFO)
-
-        log.info('Listening on %s:%s',
-                 options['host'] or '0.0.0.0', options['port'])
-        prometheus_client.start_http_server(options['port'], options['host'])
-
-        if options['queuelength_interval']:
-            self.queuelength_thread = QueueLengthMonitor(
-                self.app, options['queuelength_interval'])
-            self.queuelength_thread.start()
-
-        return options, args
-
-    def add_arguments(self, parser):
-        parser.add_argument(
-            '--verbose', help='Enable debug logging', action='store_true')
-
-        parser.add_argument(
-            '--host', default='', help='Listen host')
-        parser.add_argument(
-            '--port', default=9691, type=int, help='Listen port')
-
-        parser.add_argument(
-            '--queuelength-interval',
-            help='Check queue lengths every x seconds (0=disabled)',
-            type=int, default=0)
+    try_interval = 1
+    while True:
+        try:
+            try_interval *= 2
+            receiver()
+            try_interval = 1
+        except (KeyboardInterrupt, SystemExit):
+            log.info('Exiting')
+            if queuelength_thread:
+                queuelength_thread.stop()
+            _thread.interrupt_main()
+            break
+        except Exception as e:
+            log.error(
+                'Failed to capture events: "%s", trying again in %s seconds.',
+                e, try_interval, exc_info=True)
+            time.sleep(try_interval)
 
 
 def task_handler(fn):
