@@ -1,5 +1,6 @@
 import celery
 import celery.contrib.testing.app
+import celery.contrib.testing.worker
 import pytest
 
 
