@@ -21,7 +21,7 @@ for collector in list(prometheus_client.REGISTRY._collector_to_names):
 
 STATS = {
     'tasks': prometheus_client.Counter(
-        'celery_tasks_total', 'Number of tasks', ['state']),
+        'celery_tasks_total', 'Number of tasks', ['queue', 'state']),
     'queuetime': prometheus_client.Histogram(
         'celery_task_queuetime_seconds', 'Task queue wait time'),
     'runtime': prometheus_client.Histogram(
@@ -87,18 +87,15 @@ class CeleryEventReceiver:
 
     @task_handler
     def on_task_started(self, event, task):
-        # XXX We'd like to maybe differentiate this by queue, but
-        # task.routing_key is always None, even though in redis it contains the
-        # queue name.
         log.debug('Started %s', task)
-        STATS['tasks'].labels('started').inc()
+        STATS['tasks'].labels(task.routing_key, 'started').inc()
         if task.sent:
             STATS['queuetime'].observe(time.time() - task.sent)
 
     @task_handler
     def on_task_succeeded(self, event, task):
         log.debug('Succeeded %s', task)
-        STATS['tasks'].labels('succeeded').inc()
+        STATS['tasks'].labels(task.routing_key, 'succeeded').inc()
         self.record_runtime(task)
 
     def record_runtime(self, task):
@@ -108,13 +105,13 @@ class CeleryEventReceiver:
     @task_handler
     def on_task_failed(self, event, task):
         log.debug('Failed %s', task)
-        STATS['tasks'].labels('failed').inc()
+        STATS['tasks'].labels(task.routing_key, 'failed').inc()
         self.record_runtime(task)
 
     @task_handler
     def on_task_retried(self, event, task):
         log.debug('Retried %s', task)
-        STATS['tasks'].labels('retried').inc()
+        STATS['tasks'].labels(task.routing_key, 'retried').inc()
         self.record_runtime(task)
 
     def __call__(self, *args, **kw):

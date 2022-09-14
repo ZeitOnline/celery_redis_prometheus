@@ -12,5 +12,6 @@ def test_collects_task_events(celery_worker):
     conftest.celery_ping.delay().get()
     thread.join()
     data = celery_redis_prometheus.exporter.STATS['tasks'].collect()
-    item = [x for x in data[0].samples if x.labels == {'state': 'succeeded'}]
+    item = [x for x in data[0].samples
+            if x.labels.get('state', '') == 'succeeded']
     assert item[0].value == 1
