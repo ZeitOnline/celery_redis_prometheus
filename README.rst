@@ -34,7 +34,7 @@ Configure Prometheus
 
 We export the following metrics:
 
-* ``celery_tasks_total{state="started|succeeded|failed|retried", queue="..."}``, counter
+* ``celery_tasks_total{state="started|succeeded|failed|retried|retries-exceeded", queue="..."}``, counter
 * ``celery_task_queuetime_seconds``, histogram (only if ``task_send_sent_event`` is enabled in Celery) 
 * ``celery_task_runtime_seconds``, histogram
 

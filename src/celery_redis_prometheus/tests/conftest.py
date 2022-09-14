@@ -21,3 +21,8 @@ def celery_worker(request):
 @CELERY.task(name='celery.ping')
 def celery_ping():
     return 'pong'
+
+
+@CELERY.task(bind=True, max_retries=1)
+def provoke_retry(self):
+    self.retry(countdown=0)

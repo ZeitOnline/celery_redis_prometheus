@@ -105,7 +105,11 @@ class CeleryEventReceiver:
     @task_handler
     def on_task_failed(self, event, task):
         log.debug('Failed %s', task)
-        STATS['tasks'].labels(task.routing_key, 'failed').inc()
+        state = 'failed'
+        exc = event.get('exception', 'Unknown').split('(')[0]
+        if exc == 'MaxRetriesExceededError':
+            state = 'retries-exceeded'
+        STATS['tasks'].labels(task.routing_key, state).inc()
         self.record_runtime(task)
 
     @task_handler

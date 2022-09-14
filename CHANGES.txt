@@ -5,6 +5,7 @@ celery_redis_prometheus changes
 ------------------
 
 - Add `queue` label to `celery_tasks_total` metric
+- Add separate state `retries-exceeded` (previously used `failed`)
 
 
 1.2.0 (2022-06-23)
