@@ -35,8 +35,8 @@ Configure Prometheus
 We export the following metrics:
 
 * ``celery_tasks_total{state="started|succeeded|failed|retried|retries-exceeded", queue="..."}``, counter
-* ``celery_task_queuetime_seconds``, histogram (only if ``task_send_sent_event`` is enabled in Celery) 
-* ``celery_task_runtime_seconds``, histogram
+* ``celery_task_queuetime_seconds{queue}``, histogram (only if ``task_send_sent_event`` is enabled in Celery) 
+* ``celery_task_runtime_seconds{queue}``, histogram
 
 If you pass ``--queuelength-interval=x`` then every x seconds the queue lengths will be checked (NOTE: this only works with redis as the broker), resulting in this additional metric:
 

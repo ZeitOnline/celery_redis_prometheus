@@ -23,9 +23,9 @@ STATS = {
     'tasks': prometheus_client.Counter(
         'celery_tasks_total', 'Number of tasks', ['queue', 'state']),
     'queuetime': prometheus_client.Histogram(
-        'celery_task_queuetime_seconds', 'Task queue wait time'),
+        'celery_task_queuetime_seconds', 'Task queue wait time', ['queue']),
     'runtime': prometheus_client.Histogram(
-        'celery_task_runtime_seconds', 'Task runtime'),
+        'celery_task_runtime_seconds', 'Task runtime', ['queue']),
     'queues': prometheus_client.Gauge(
         'celery_queue_length', 'Queue length', ['queue'])
 }
@@ -90,7 +90,8 @@ class CeleryEventReceiver:
         log.debug('Started %s', task)
         STATS['tasks'].labels(task.routing_key, 'started').inc()
         if task.sent:
-            STATS['queuetime'].observe(time.time() - task.sent)
+            STATS['queuetime'].labels(task.routing_key).observe(
+                time.time() - task.sent)
 
     @task_handler
     def on_task_succeeded(self, event, task):
@@ -100,7 +101,7 @@ class CeleryEventReceiver:
 
     def record_runtime(self, task):
         if task is not None and task.runtime is not None:
-            STATS['runtime'].observe(task.runtime)
+            STATS['runtime'].labels(task.routing_key).observe(task.runtime)
 
     @task_handler
     def on_task_failed(self, event, task):
