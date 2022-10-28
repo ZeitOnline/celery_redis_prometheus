@@ -1,7 +1,7 @@
 celery_redis_prometheus changes
 ===============================
 
-1.4.0 (unreleased)
+1.4.0 (2022-10-28)
 ------------------
 
 - Add `queue` label to task_queuetime and task_runtime metrics
