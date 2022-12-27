@@ -15,7 +15,7 @@ vine==5.0.0
 wcwidth==0.2.5
 
 # setuptools
-setuptools == 62.3.2
+setuptools == 65.5.1
 six==1.16.0
 
 # pytest
