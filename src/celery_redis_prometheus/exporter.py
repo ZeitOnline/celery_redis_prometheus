@@ -15,8 +15,9 @@ log = logging.getLogger(__name__)
 
 # Remove any `process_` and `python_` metrics, since we're proxying for the
 # whole celery machinery, but those would only be about this process.
-for collector in list(prometheus_client.REGISTRY._collector_to_names):
-    prometheus_client.REGISTRY.unregister(collector)
+prometheus_client.REGISTRY.unregister(prometheus_client.GC_COLLECTOR)
+prometheus_client.REGISTRY.unregister(prometheus_client.PLATFORM_COLLECTOR)
+prometheus_client.REGISTRY.unregister(prometheus_client.PROCESS_COLLECTOR)
 
 
 STATS = {

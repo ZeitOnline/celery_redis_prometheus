@@ -4,7 +4,7 @@ celery_redis_prometheus changes
 1.5.0 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Be explicit about unregistering default collectors
 
 
 1.4.0 (2022-10-28)
