@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='celery_redis_prometheus',
-    version='1.5.1',
+    version='1.6.0.dev0',
     author='Zeit Online',
     author_email='zon-backend@zeit.de',
     url='https://github.com/zeitonline/celery_redis_prometheus',
