@@ -1,6 +1,12 @@
 celery_redis_prometheus changes
 ===============================
 
+1.6.0 (unreleased)
+------------------
+
+- Nothing changed yet.
+
+
 1.5.0 (2023-10-27)
 ------------------
 
