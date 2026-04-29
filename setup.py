@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 setup(
     name='celery_redis_prometheus',
     version='1.6.0.dev0',
-    author='Zeit Online',
+    author='Die ZEIT Online Engineering',
     author_email='zon-backend@zeit.de',
     url='https://github.com/zeitonline/celery_redis_prometheus',
     description="Exports task execution metrics in Prometheus format",
