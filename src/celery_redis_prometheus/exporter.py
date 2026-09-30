@@ -30,6 +30,10 @@ STATS = {
         'celery_task_runtime_seconds', 'Task runtime', ['queue']
     ),
     'queues': prometheus_client.Gauge('celery_queue_length', 'Queue length', ['queue']),
+    'queues_checked': prometheus_client.Gauge(
+        'celery_queue_length_last_success_timestamp_seconds',
+        'Time of the last successful queue length check',
+    ),
 }
 
 
@@ -174,10 +178,11 @@ class QueueLengthMonitor(threading.Thread):
 
                 for queue, length in lengths.items():
                     STATS['queues'].labels(queue).set(length)
-
-                time.sleep(self.interval)
+                STATS['queues_checked'].set_to_current_time()
             except Exception:
                 log.error('Uncaught exception, preventing thread from crashing.', exc_info=True)
+            finally:
+                time.sleep(self.interval)
 
     def stop(self):
         self.running = False

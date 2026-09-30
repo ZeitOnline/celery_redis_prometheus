@@ -1,0 +1,1 @@
+Wait for the interval after a failed queue length check, too, instead of retrying immediately

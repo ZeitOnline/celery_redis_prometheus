@@ -36,7 +36,8 @@ We export the following metrics:
 If you pass `--queuelength-interval=x` then every x seconds the queue lengths will be checked (NOTE: this only works with redis as the broker), resulting in this additional metric:
 
 * `celery_queue_length{queue="..."}`, gauge
-
+* `celery_queue_length_last_success_timestamp_seconds`, gauge.
+  `celery_queue_length` keeps its last value while the broker cannot be reached, so alert on the age of this timestamp to detect that.
 
 ## Run tests
 

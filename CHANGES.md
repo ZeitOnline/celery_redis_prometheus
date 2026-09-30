@@ -2,11 +2,6 @@
 
 <!-- towncrier release notes start -->
 
-## 1.6.0 (unreleased)
-
-- Nothing changed yet.
-
-
 ## 1.5.2 (2026-07-27)
 
 - Remove unused `setuptools` dependency
