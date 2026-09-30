@@ -35,6 +35,7 @@ def test_sets_separate_state_for_retry_failed(celery_worker):
     assert item[0].value == 1
 
 
+# Patch time.sleep so that we can reliably interrupt monitor.run()
 def run_monitor_once(monkeypatch, app):
     monitor = celery_redis_prometheus.exporter.QueueLengthMonitor(app, 7)
     sleeps = []
@@ -54,14 +55,23 @@ def last_queue_check():
 
 
 def test_queue_length_check_records_success_time(monkeypatch):
-    app = unittest.mock.MagicMock()
+    # run() reads the queue lengths via
+    # `with app.connection() as connection:` and
+    # `connection.channel().client.pipeline(...)`, so hand it a pipeline
+    # whose result we control.
+    pipe = unittest.mock.Mock()
+    pipe.execute.return_value = [3, [b'[{}, "", "default"]']]
+    connection = unittest.mock.MagicMock()
+    connection.__enter__.return_value = connection
+    connection.channel.return_value.client.pipeline.return_value = pipe
+    app = unittest.mock.Mock()
+    app.connection.return_value = connection
     app.conf = {'task_queues': [kombu.Queue('default')]}
-    connection = app.connection.return_value.__enter__.return_value
-    pipe = connection.channel.return_value.client.pipeline.return_value
-    pipe.execute.return_value = [3, [b'[{}, {}, "", "default"]']]
     before = time.time()
 
     assert run_monitor_once(monkeypatch, app) == [7]
+    pipe.llen.assert_called_once_with('default')
+    pipe.hvals.assert_called_once_with('unacked')
     data = celery_redis_prometheus.exporter.STATS['queues'].collect()
     lengths = {x.labels['queue']: x.value for x in data[0].samples}
     assert lengths['default'] == 4

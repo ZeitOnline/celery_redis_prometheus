@@ -179,6 +179,7 @@ class QueueLengthMonitor(threading.Thread):
                 for queue, length in lengths.items():
                     STATS['queues'].labels(queue).set(length)
                 STATS['queues_checked'].set_to_current_time()
+
             except Exception:
                 log.error('Uncaught exception, preventing thread from crashing.', exc_info=True)
             finally:
