@@ -21,6 +21,7 @@ prometheus = "celery_redis_prometheus.exporter:main"
 
 [dependency-groups]
 dev = ["pytest"]
+lint = ["lefthook", "ruff"]
 release = ["towncrier"]
 
 
@@ -51,3 +52,18 @@ underlines = ["", ""]
 directory = "change"
 name = ""
 showcontent = true
+
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+fixable = ["ALL"]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint.isort]
+from-first = true
+lines-after-imports = 2

@@ -1,13 +1,14 @@
 from functools import wraps
-import celery.bin.base
-import click
+import _thread
 import collections
 import json
 import logging
-import prometheus_client
-import _thread
 import threading
 import time
+
+import celery.bin.base
+import click
+import prometheus_client
 
 
 log = logging.getLogger(__name__)
@@ -21,14 +22,14 @@ prometheus_client.REGISTRY.unregister(prometheus_client.PROCESS_COLLECTOR)
 
 
 STATS = {
-    'tasks': prometheus_client.Counter(
-        'celery_tasks_total', 'Number of tasks', ['queue', 'state']),
+    'tasks': prometheus_client.Counter('celery_tasks_total', 'Number of tasks', ['queue', 'state']),
     'queuetime': prometheus_client.Histogram(
-        'celery_task_queuetime_seconds', 'Task queue wait time', ['queue']),
+        'celery_task_queuetime_seconds', 'Task queue wait time', ['queue']
+    ),
     'runtime': prometheus_client.Histogram(
-        'celery_task_runtime_seconds', 'Task runtime', ['queue']),
-    'queues': prometheus_client.Gauge(
-        'celery_queue_length', 'Queue length', ['queue'])
+        'celery_task_runtime_seconds', 'Task runtime', ['queue']
+    ),
+    'queues': prometheus_client.Gauge('celery_queue_length', 'Queue length', ['queue']),
 }
 
 
@@ -36,8 +37,8 @@ STATS = {
 @click.option('--host', default='0.0.0.0', help='Listen host')
 @click.option('--port', default=9691, help='Listen port')
 @click.option(
-    '--queuelength-interval', default=0,
-    help='Check queue lengths every x seconds (0=disabled)')
+    '--queuelength-interval', default=0, help='Check queue lengths every x seconds (0=disabled)'
+)
 @click.option('--verbose', is_flag=True, help='Enable debug logging')
 @click.pass_context
 def main(ctx, host, port, queuelength_interval, verbose):
@@ -68,7 +69,10 @@ def main(ctx, host, port, queuelength_interval, verbose):
         except Exception as e:
             log.error(
                 'Failed to capture events: "%s", trying again in %s seconds.',
-                e, try_interval, exc_info=True)
+                e,
+                try_interval,
+                exc_info=True,
+            )
             time.sleep(try_interval)
 
 
@@ -78,11 +82,11 @@ def task_handler(fn):
         self.state.event(event)
         task = self.state.tasks.get(event['uuid'])
         return fn(self, event, task)
+
     return wrapper
 
 
 class CeleryEventReceiver:
-
     def __init__(self, app):
         self.app = app
 
@@ -91,8 +95,7 @@ class CeleryEventReceiver:
         log.debug('Started %s', task)
         STATS['tasks'].labels(task.routing_key, 'started').inc()
         if task.sent:
-            STATS['queuetime'].labels(task.routing_key).observe(
-                time.time() - task.sent)
+            STATS['queuetime'].labels(task.routing_key).observe(time.time() - task.sent)
 
     @task_handler
     def on_task_succeeded(self, event, task):
@@ -125,18 +128,20 @@ class CeleryEventReceiver:
         kw.setdefault('wakeup', False)
 
         with self.app.connection() as connection:
-            recv = self.app.events.Receiver(connection, handlers={
-                'task-started': self.on_task_started,
-                'task-succeeded': self.on_task_succeeded,
-                'task-failed': self.on_task_failed,
-                'task-retried': self.on_task_retried,
-                '*': self.state.event,
-            })
+            recv = self.app.events.Receiver(
+                connection,
+                handlers={
+                    'task-started': self.on_task_started,
+                    'task-succeeded': self.on_task_succeeded,
+                    'task-failed': self.on_task_failed,
+                    'task-retried': self.on_task_retried,
+                    '*': self.state.event,
+                },
+            )
             recv.capture(*args, **kw)
 
 
 class QueueLengthMonitor(threading.Thread):
-
     def __init__(self, app, interval):
         super().__init__()
         self.app = app
@@ -149,8 +154,7 @@ class QueueLengthMonitor(threading.Thread):
                 lengths = collections.Counter()
 
                 with self.app.connection() as connection:
-                    pipe = connection.channel().client.pipeline(
-                        transaction=False)
+                    pipe = connection.channel().client.pipeline(transaction=False)
                     for queue in self.app.conf['task_queues']:
                         # Not claimed by any worker yet
                         pipe.llen(queue.name)
@@ -173,9 +177,7 @@ class QueueLengthMonitor(threading.Thread):
 
                 time.sleep(self.interval)
             except Exception:
-                log.error(
-                    'Uncaught exception, preventing thread from crashing.',
-                    exc_info=True)
+                log.error('Uncaught exception, preventing thread from crashing.', exc_info=True)
 
     def stop(self):
         self.running = False
