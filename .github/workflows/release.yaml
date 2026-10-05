@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  workflow_dispatch: {}
+
+env:
+  BUILD_URL: "${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}}"
+  TEAM_CONTENT_ALERTS: C06JB4PMALW
+
+jobs:
+  release:
+    runs-on: zon-ubuntu-general-dind
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ZeitOnline/gh-action-baseproject@v0
+        id: baseproject
+        with:
+          project_name: pypi-oss
+          environment: production
+          vault_export_token: true
+      - run: bin/release
+        env:
+          VAULT_ADDR: ${{steps.baseproject.outputs.vault_addr}}
+      - uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4
+        if: failure()
+        with:
+          method: chat.postMessage
+          token: ${{secrets.SLACK_BOT_TOKEN}}
+          payload: |
+            channel: "${{env.TEAM_CONTENT_ALERTS}}"
+            text: ":red_circle: <${{env.build_url}}|${{github.repository}}> release failed"
