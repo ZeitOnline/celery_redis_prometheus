@@ -1,0 +1,1 @@
+Read queue lengths on each scrape instead of polling them in a background thread, so a broker outage no longer leaves stale values behind. `--queuelength-interval` now only enables the metric, its value is ignored

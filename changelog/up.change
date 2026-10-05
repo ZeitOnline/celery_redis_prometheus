@@ -1,0 +1,1 @@
+Add `celery_queue_length_up`, which is 0 if the queue lengths could not be read

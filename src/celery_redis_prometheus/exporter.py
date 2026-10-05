@@ -3,12 +3,13 @@ import _thread
 import collections
 import json
 import logging
-import threading
 import time
 
 import celery.bin.base
 import click
 import prometheus_client
+import prometheus_client.core
+import prometheus_client.registry
 
 
 log = logging.getLogger(__name__)
@@ -29,11 +30,6 @@ STATS = {
     'runtime': prometheus_client.Histogram(
         'celery_task_runtime_seconds', 'Task runtime', ['queue']
     ),
-    'queues': prometheus_client.Gauge('celery_queue_length', 'Queue length', ['queue']),
-    'queues_checked': prometheus_client.Gauge(
-        'celery_queue_length_last_success_timestamp_seconds',
-        'Time of the last successful queue length check',
-    ),
 }
 
 
@@ -41,7 +37,10 @@ STATS = {
 @click.option('--host', default='0.0.0.0', help='Listen host')
 @click.option('--port', default=9691, help='Listen port')
 @click.option(
-    '--queuelength-interval', default=0, help='Check queue lengths every x seconds (0=disabled)'
+    '--queuelength-interval',
+    default=0,
+    help='Export queue lengths if > 0 (0=disabled). They are read on each scrape, '
+    'the value itself is ignored and only kept for compatibility.',
 )
 @click.option('--verbose', is_flag=True, help='Enable debug logging')
 @click.pass_context
@@ -49,10 +48,8 @@ def main(ctx, host, port, queuelength_interval, verbose):
     app = ctx.obj.app
     app.log.setup(logging.DEBUG if verbose else logging.INFO)
 
-    queuelength_thread = None
     if queuelength_interval:
-        queuelength_thread = QueueLengthMonitor(app, queuelength_interval)
-        queuelength_thread.start()
+        prometheus_client.REGISTRY.register(QueueLengthCollector(app))
 
     receiver = CeleryEventReceiver(app)
     prometheus_client.start_http_server(port, host)
@@ -66,8 +63,6 @@ def main(ctx, host, port, queuelength_interval, verbose):
             try_interval = 1
         except (KeyboardInterrupt, SystemExit):
             log.info('Exiting')
-            if queuelength_thread:
-                queuelength_thread.stop()
             _thread.interrupt_main()
             break
         except Exception as e:
@@ -145,45 +140,69 @@ class CeleryEventReceiver:
             recv.capture(*args, **kw)
 
 
-class QueueLengthMonitor(threading.Thread):
-    def __init__(self, app, interval):
-        super().__init__()
+class QueueLengthCollector(prometheus_client.registry.Collector):
+    """Reads the queue lengths from redis whenever Prometheus scrapes us, so a
+    broker outage shows up as `celery_queue_length_up 0` instead of stale values.
+    """
+
+    # kombu waits forever on a hanging redis by default; we have to answer
+    # well within the Prometheus scrape timeout (10s by default).
+    TRANSPORT_OPTIONS = {'socket_timeout': 5, 'socket_connect_timeout': 5}
+
+    def __init__(self, app):
         self.app = app
-        self.interval = interval
-        self.running = True
 
-    def run(self):
-        while self.running:
-            try:
-                lengths = collections.Counter()
+    # Without describe(), registering would call collect() and thus hit redis.
+    def describe(self):
+        yield self._lengths_metric()
+        yield self._up_metric()
 
-                with self.app.connection() as connection:
-                    pipe = connection.channel().client.pipeline(transaction=False)
-                    for queue in self.app.conf['task_queues']:
-                        # Not claimed by any worker yet
-                        pipe.llen(queue.name)
-                    # Claimed by worker but not acked/processed yet
-                    pipe.hvals('unacked')
+    def collect(self):
+        up = self._up_metric()
+        try:
+            lengths = self.queue_lengths()
+        except Exception:
+            log.error('Failed to check queue lengths', exc_info=True)
+            up.add_metric([], 0)
+        else:
+            metric = self._lengths_metric()
+            for queue, length in lengths.items():
+                metric.add_metric([queue], length)
+            yield metric
+            up.add_metric([], 1)
+        yield up
 
-                    result = pipe.execute()
+    def queue_lengths(self):
+        lengths = collections.Counter()
+        options = dict(
+            self.TRANSPORT_OPTIONS, **(self.app.conf.get('broker_transport_options') or {})
+        )
+        with self.app.connection(transport_options=options) as connection:
+            pipe = connection.channel().client.pipeline(transaction=False)
+            for queue in self.app.conf['task_queues']:
+                # Not claimed by any worker yet
+                pipe.llen(queue.name)
+            # Claimed by worker but not acked/processed yet
+            pipe.hvals('unacked')
 
-                unacked = result.pop()
-                for task in unacked:
-                    data = json.loads(task.decode('utf-8'))
-                    queue = data[-1]
-                    lengths[queue] += 1
+            result = pipe.execute()
 
-                for llen, queue in zip(result, self.app.conf['task_queues']):
-                    lengths[queue.name] += llen
+        unacked = result.pop()
+        for task in unacked:
+            data = json.loads(task.decode('utf-8'))
+            queue = data[-1]
+            lengths[queue] += 1
 
-                for queue, length in lengths.items():
-                    STATS['queues'].labels(queue).set(length)
-                STATS['queues_checked'].set_to_current_time()
+        for llen, queue in zip(result, self.app.conf['task_queues']):
+            lengths[queue.name] += llen
+        return lengths
 
-            except Exception:
-                log.error('Uncaught exception, preventing thread from crashing.', exc_info=True)
-            finally:
-                time.sleep(self.interval)
+    def _lengths_metric(self):
+        return prometheus_client.core.GaugeMetricFamily(
+            'celery_queue_length', 'Queue length', labels=['queue']
+        )
 
-    def stop(self):
-        self.running = False
+    def _up_metric(self):
+        return prometheus_client.core.GaugeMetricFamily(
+            'celery_queue_length_up', 'Whether the queue lengths could be read'
+        )

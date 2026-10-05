@@ -33,11 +33,12 @@ We export the following metrics:
 * `celery_task_queuetime_seconds{queue}`, histogram (only if `task_send_sent_event` is enabled in Celery)
 * `celery_task_runtime_seconds{queue}`, histogram
 
-If you pass `--queuelength-interval=x` then every x seconds the queue lengths will be checked (NOTE: this only works with redis as the broker), resulting in this additional metric:
+If you pass `--queuelength-interval=x` (any x > 0), the queue lengths are read from the broker on each scrape (NOTE: this only works with redis as the broker), resulting in these additional metrics:
 
 * `celery_queue_length{queue="..."}`, gauge
-* `celery_queue_length_last_success_timestamp_seconds`, gauge.
-  `celery_queue_length` keeps its last value while the broker cannot be reached, so alert on the age of this timestamp to detect that.
+* `celery_queue_length_up`, gauge: 1 if the queue lengths could be read, 0 otherwise.
+  `celery_queue_length` is left out while the broker cannot be reached, so alert on `celery_queue_length_up == 0`.
+  Reading times out after 5 seconds; set `socket_timeout`/`socket_connect_timeout` in `broker_transport_options` to change that.
 
 ## Run tests
 
