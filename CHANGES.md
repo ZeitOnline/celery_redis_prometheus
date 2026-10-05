@@ -1,62 +1,52 @@
-celery_redis_prometheus changes
-===============================
+# celery_redis_prometheus changes
 
-1.6.0 (unreleased)
-------------------
+
+## 1.6.0 (unreleased)
 
 - Nothing changed yet.
 
 
-1.5.2 (2026-07-27)
-------------------
+## 1.5.2 (2026-07-27)
 
 - Remove unused `setuptools` dependency
 
 
-1.5.1 (2023-10-27)
-------------------
+## 1.5.1 (2023-10-27)
 
 - Fix brown-bag release
 
 
-1.5.0 (2023-10-27)
-------------------
+## 1.5.0 (2023-10-27)
 
 - Be explicit about unregistering default collectors
 
 
-1.4.0 (2022-10-28)
-------------------
+## 1.4.0 (2022-10-28)
 
 - Add `queue` label to task_queuetime and task_runtime metrics
 
 
-1.3.0 (2022-09-14)
-------------------
+## 1.3.0 (2022-09-14)
 
 - Add `queue` label to `celery_tasks_total` metric
 - Add separate state `retries-exceeded` (previously used `failed`)
 
 
-1.2.0 (2022-06-23)
-------------------
+## 1.2.0 (2022-06-23)
 
 - Update to celery-5.x
 
 
-1.1.1 (2020-03-20)
-------------------
+## 1.1.1 (2020-03-20)
 
 - Fix py2 class syntax issues
 
 
-1.1.0 (2020-03-20)
-------------------
+## 1.1.0 (2020-03-20)
 
 - Make py2 compatible.
 
 
-1.0.0 (2020-03-20)
-------------------
+## 1.0.0 (2020-03-20)
 
 - Initial release

@@ -9,7 +9,7 @@ setup(
     url='https://github.com/zeitonline/celery_redis_prometheus',
     description="Exports task execution metrics in Prometheus format",
     long_description='\n\n'.join(
-        open(x).read() for x in ['README.rst', 'CHANGES.txt']),
+        open(x).read() for x in ['README.md', 'CHANGES.md']),
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=True,
