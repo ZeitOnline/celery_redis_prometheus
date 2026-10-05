@@ -1,0 +1,31 @@
+#!/bin/bash
+
+set -e
+if [[ -n "$CI" ]]; then set -x; fi
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+
+function main() {
+    cd "$DIR/.."
+
+    local command=$1
+    case $command in
+        lefthook)
+            build_lefthook
+        ;;
+        *)
+            build_lefthook
+        ;;
+    esac
+}
+
+function build_lefthook() {
+    uv sync --frozen --only-group lint
+
+    if [[ -z "$CI" && ! -f .git/hooks/pre-commit ]]; then
+        lefthook install
+    fi
+}
+
+
+main "$@"
