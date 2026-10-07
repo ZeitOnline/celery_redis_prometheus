@@ -1,5 +1,4 @@
 from functools import wraps
-import _thread
 import collections
 import json
 import logging
@@ -132,7 +131,6 @@ class CeleryEventReceiver:
                 try_interval = 1
             except (KeyboardInterrupt, SystemExit):
                 log.info('Exiting')
-                _thread.interrupt_main()
                 break
             except Exception as e:
                 log.error(
