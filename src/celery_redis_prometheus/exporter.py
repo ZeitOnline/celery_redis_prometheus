@@ -22,6 +22,9 @@ prometheus_client.REGISTRY.unregister(prometheus_client.PLATFORM_COLLECTOR)
 prometheus_client.REGISTRY.unregister(prometheus_client.PROCESS_COLLECTOR)
 
 
+# Creating a metric registers it with prometheus_client's default REGISTRY,
+# which the HTTP server started in main() renders anew on each request. So
+# updating these is all it takes to export a new value.
 STATS = {
     'tasks': prometheus_client.Counter('celery_tasks_total', 'Number of tasks', ['queue', 'state']),
     'queuetime': prometheus_client.Histogram(
@@ -51,31 +54,18 @@ def main(ctx, host, port, queuelength_interval, verbose):
     if queuelength_interval:
         prometheus_client.REGISTRY.register(QueueLengthCollector(app))
 
-    receiver = CeleryEventReceiver(app)
+    # Serves REGISTRY from a daemon thread.
     prometheus_client.start_http_server(port, host)
     log.info('Listening on %s:%s', host, port)
 
-    try_interval = 1
-    while True:
-        try:
-            try_interval *= 2
-            receiver()
-            try_interval = 1
-        except (KeyboardInterrupt, SystemExit):
-            log.info('Exiting')
-            _thread.interrupt_main()
-            break
-        except Exception as e:
-            log.error(
-                'Failed to capture events: "%s", trying again in %s seconds.',
-                e,
-                try_interval,
-                exc_info=True,
-            )
-            time.sleep(try_interval)
+    CeleryEventReceiver(app).run_forever()
 
 
 def task_handler(fn):
+    """Applies the event to the tracked state first, and passes the task it
+    belongs to, so handlers see what earlier events said about it (e.g. its
+    queue, or when it was sent)."""
+
     @wraps(fn)
     def wrapper(self, event):
         self.state.event(event)
@@ -86,6 +76,15 @@ def task_handler(fn):
 
 
 class CeleryEventReceiver:
+    """Turns the Celery event stream into the metrics in STATS.
+
+    Workers publish an event to the broker for each task state change, if
+    they are started with `-E` (or `worker_send_task_events`). We subscribe
+    to these and record them in a `celery.events.State`, which collects the
+    events of each task. The handlers only update the metrics, Prometheus
+    picks up their current values on its next scrape.
+    """
+
     def __init__(self, app):
         self.app = app
 
@@ -122,7 +121,31 @@ class CeleryEventReceiver:
         STATS['tasks'].labels(task.routing_key, 'retried').inc()
         self.record_runtime(task)
 
-    def __call__(self, *args, **kw):
+    def run_forever(self):
+        """Captures events until interrupted, reconnecting with a growing
+        delay when the broker connection fails."""
+        try_interval = 1
+        while True:
+            try:
+                try_interval *= 2
+                self.capture()
+                try_interval = 1
+            except (KeyboardInterrupt, SystemExit):
+                log.info('Exiting')
+                _thread.interrupt_main()
+                break
+            except Exception as e:
+                log.error(
+                    'Failed to capture events: "%s", trying again in %s seconds.',
+                    e,
+                    try_interval,
+                    exc_info=True,
+                )
+                time.sleep(try_interval)
+
+    def capture(self, *args, **kw):
+        """Captures events, blocking until `limit` events were handled or
+        forever. Arguments are passed to `celery.events.Receiver.capture()`."""
         self.state = self.app.events.State()
         kw.setdefault('wakeup', False)
 
