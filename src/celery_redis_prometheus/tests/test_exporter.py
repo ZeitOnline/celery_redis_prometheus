@@ -54,9 +54,9 @@ def redis_app(*results):
     return app
 
 
-def broken_app():
+def broken_app(**conf):
     app = unittest.mock.MagicMock()
-    app.conf = {'task_queues': [kombu.Queue('default')]}
+    app.conf = {'task_queues': [kombu.Queue('default')], **conf}
     app.connection.side_effect = ConnectionError('broker down')
     return app
 
@@ -107,6 +107,30 @@ def test_recovers_after_failed_read():
 
     assert registry.get_sample_value('celery_queue_length', {'queue': 'default'}) is None
     assert registry.get_sample_value('celery_queue_length', {'queue': 'default'}) == 1
+
+
+def test_times_out_on_hanging_broker_by_default():
+    app = broken_app()
+    scrape(queue_metrics(app))
+
+    options = app.connection.call_args.kwargs['transport_options']
+    assert options == {'socket_timeout': 3, 'socket_connect_timeout': 3}
+
+
+def test_does_not_retry_connecting():
+    app = redis_app([1, 0, []])
+    scrape(queue_metrics(app))
+
+    connection = app.connection.return_value
+    connection.ensure_connection.assert_called_once_with(max_retries=0)
+
+
+def test_configured_transport_options_override_default_timeout():
+    app = broken_app(broker_transport_options={'socket_timeout': 2})
+    scrape(queue_metrics(app))
+
+    options = app.connection.call_args.kwargs['transport_options']
+    assert options == {'socket_timeout': 2, 'socket_connect_timeout': 3}
 
 
 def test_broker_outage_keeps_task_metrics_on_the_same_endpoint():

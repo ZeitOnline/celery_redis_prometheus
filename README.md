@@ -39,6 +39,8 @@ If you pass `--queuelength-interval=x` (any x > 0), the queue lengths are read f
 
 While the broker cannot be reached, `celery_queue_length` is left out instead of keeping its last value.
 
+Reading gives up after 3 seconds; set `socket_timeout`/`socket_connect_timeout` in `broker_transport_options` to change that.
+
 
 ## Run tests
 

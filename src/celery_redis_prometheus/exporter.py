@@ -147,6 +147,12 @@ class QueueLengthCollector(prometheus_client.registry.Collector):
     scrape, so the event metrics are still exported during a broker outage.
     """
 
+    # By default, the broker connection waits forever for a redis that stops
+    # answering, but we have to respond within the Prometheus scrape timeout
+    # (10s by default). Connecting, the handshake and the query can each take
+    # one full timeout, so 3 x 3s at worst.
+    TRANSPORT_OPTIONS = {'socket_timeout': 3, 'socket_connect_timeout': 3}
+
     def __init__(self, app):
         self.app = app
 
@@ -166,8 +172,16 @@ class QueueLengthCollector(prometheus_client.registry.Collector):
         yield metric
 
     def queue_lengths(self):
+        # Celery puts the options passed here over `broker_transport_options`,
+        # so merge ours underneath to let the configured ones win.
+        options = dict(
+            self.TRANSPORT_OPTIONS, **self.app.conf.get('broker_transport_options') or {}
+        )
         queues = self.app.conf['task_queues']
-        with self.app.connection() as connection:
+        with self.app.connection(transport_options=options) as connection:
+            # channel() would otherwise connect with one retry after sleeping 2s,
+            # which doubles the time we hang on an unresponsive broker.
+            connection.ensure_connection(max_retries=0)
             pipe = connection.channel().client.pipeline(transaction=False)
             for queue in queues:
                 # Not claimed by any worker yet
