@@ -3,12 +3,13 @@ import _thread
 import collections
 import json
 import logging
-import threading
 import time
 
 import celery.bin.base
 import click
 import prometheus_client
+import prometheus_client.core
+import prometheus_client.registry
 
 
 log = logging.getLogger(__name__)
@@ -29,7 +30,6 @@ STATS = {
     'runtime': prometheus_client.Histogram(
         'celery_task_runtime_seconds', 'Task runtime', ['queue']
     ),
-    'queues': prometheus_client.Gauge('celery_queue_length', 'Queue length', ['queue']),
 }
 
 
@@ -37,7 +37,10 @@ STATS = {
 @click.option('--host', default='0.0.0.0', help='Listen host')
 @click.option('--port', default=9691, help='Listen port')
 @click.option(
-    '--queuelength-interval', default=0, help='Check queue lengths every x seconds (0=disabled)'
+    '--queuelength-interval',
+    default=0,
+    help='Export queue lengths if > 0 (0=disabled). They are read on each scrape, '
+    'the value itself is only kept for compatibility.',
 )
 @click.option('--verbose', is_flag=True, help='Enable debug logging')
 @click.pass_context
@@ -45,10 +48,8 @@ def main(ctx, host, port, queuelength_interval, verbose):
     app = ctx.obj.app
     app.log.setup(logging.DEBUG if verbose else logging.INFO)
 
-    queuelength_thread = None
     if queuelength_interval:
-        queuelength_thread = QueueLengthMonitor(app, queuelength_interval)
-        queuelength_thread.start()
+        prometheus_client.REGISTRY.register(QueueLengthCollector(app))
 
     receiver = CeleryEventReceiver(app)
     prometheus_client.start_http_server(port, host)
@@ -62,8 +63,6 @@ def main(ctx, host, port, queuelength_interval, verbose):
             try_interval = 1
         except (KeyboardInterrupt, SystemExit):
             log.info('Exiting')
-            if queuelength_thread:
-                queuelength_thread.stop()
             _thread.interrupt_main()
             break
         except Exception as e:
@@ -141,43 +140,51 @@ class CeleryEventReceiver:
             recv.capture(*args, **kw)
 
 
-class QueueLengthMonitor(threading.Thread):
-    def __init__(self, app, interval):
-        super().__init__()
+class QueueLengthCollector(prometheus_client.registry.Collector):
+    """Reads the queue lengths from redis whenever Prometheus scrapes us.
+
+    A failed read leaves out `celery_queue_length` instead of failing the whole
+    scrape, so the event metrics are still exported during a broker outage.
+    """
+
+    def __init__(self, app):
         self.app = app
-        self.interval = interval
-        self.running = True
 
-    def run(self):
-        while self.running:
-            try:
-                lengths = collections.Counter()
+    # Without describe(), register() would call collect() and thus hit redis.
+    def describe(self):
+        yield self._lengths_metric()
 
-                with self.app.connection() as connection:
-                    pipe = connection.channel().client.pipeline(transaction=False)
-                    for queue in self.app.conf['task_queues']:
-                        # Not claimed by any worker yet
-                        pipe.llen(queue.name)
-                    # Claimed by worker but not acked/processed yet
-                    pipe.hvals('unacked')
+    def collect(self):
+        try:
+            lengths = self.queue_lengths()
+        except Exception:
+            log.error('Failed to read queue lengths', exc_info=True)
+            return
+        metric = self._lengths_metric()
+        for queue, length in lengths.items():
+            metric.add_metric([queue], length)
+        yield metric
 
-                    result = pipe.execute()
+    def queue_lengths(self):
+        queues = self.app.conf['task_queues']
+        with self.app.connection() as connection:
+            pipe = connection.channel().client.pipeline(transaction=False)
+            for queue in queues:
+                # Not claimed by any worker yet
+                pipe.llen(queue.name)
+            # Claimed by worker but not acked/processed yet
+            pipe.hvals('unacked')
+            result = pipe.execute()
 
-                unacked = result.pop()
-                for task in unacked:
-                    data = json.loads(task.decode('utf-8'))
-                    queue = data[-1]
-                    lengths[queue] += 1
+        lengths = collections.Counter()
+        for task in result.pop():
+            data = json.loads(task.decode('utf-8'))
+            lengths[data[-1]] += 1
+        for llen, queue in zip(result, queues):
+            lengths[queue.name] += llen
+        return lengths
 
-                for llen, queue in zip(result, self.app.conf['task_queues']):
-                    lengths[queue.name] += llen
-
-                for queue, length in lengths.items():
-                    STATS['queues'].labels(queue).set(length)
-
-                time.sleep(self.interval)
-            except Exception:
-                log.error('Uncaught exception, preventing thread from crashing.', exc_info=True)
-
-    def stop(self):
-        self.running = False
+    def _lengths_metric(self):
+        return prometheus_client.core.GaugeMetricFamily(
+            'celery_queue_length', 'Queue length', labels=['queue']
+        )
