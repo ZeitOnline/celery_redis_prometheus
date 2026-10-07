@@ -22,8 +22,9 @@ prometheus_client.REGISTRY.unregister(prometheus_client.PROCESS_COLLECTOR)
 
 
 # Creating a metric registers it with prometheus_client's default REGISTRY,
-# which the HTTP server started in main() renders anew on each request. So
-# updating these is all it takes to export a new value.
+# which the HTTP server started in main() renders on each request. These will
+# be updated later by processing Celery events and the next scrape will
+# pick up the new values.
 STATS = {
     'tasks': prometheus_client.Counter('celery_tasks_total', 'Number of tasks', ['queue', 'state']),
     'queuetime': prometheus_client.Histogram(
@@ -82,6 +83,10 @@ class CeleryEventReceiver:
     to these and record them in a `celery.events.State`, which collects the
     events of each task. The handlers only update the metrics, Prometheus
     picks up their current values on its next scrape.
+
+    This goes against the recommended Prometheus pattern of "observe on scrape",
+    but we can't really collect the Celery task metrics without keeping state.
+    Redis metrics can be collected on scrape, QueueLengthCollector implements that.
     """
 
     def __init__(self, app):
@@ -142,8 +147,6 @@ class CeleryEventReceiver:
                 time.sleep(try_interval)
 
     def capture(self, *args, **kw):
-        """Captures events, blocking until `limit` events were handled or
-        forever. Arguments are passed to `celery.events.Receiver.capture()`."""
         self.state = self.app.events.State()
         kw.setdefault('wakeup', False)
 
