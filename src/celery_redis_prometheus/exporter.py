@@ -126,8 +126,6 @@ class CeleryEventReceiver:
         self.record_runtime(task)
 
     def run_forever(self):
-        """Captures events until interrupted, reconnecting with a growing
-        delay when the broker connection fails."""
         try_interval = 1
         while True:
             try:
@@ -165,13 +163,13 @@ class CeleryEventReceiver:
 
 
 class QueueLengthCollector(prometheus_client.registry.Collector):
-    """Reads the queue lengths from redis whenever Prometheus scrapes us.
-
-    A failed read leaves out `celery_queue_length` instead of failing the whole
-    scrape, so the event metrics are still exported during a broker outage.
+    """
+    Reads the queue lengths from Redis and exposes them on each scrape.
+    This is a separate collector because we don't need to keep Celery state
+    and we want to be able to tell if the broker is down.
     """
 
-    # By default, the broker connection waits forever for a redis that stops
+    # By default, the broker connection waits forever for a Redis that stops
     # answering, but we have to respond within the Prometheus scrape timeout
     # (10s by default). Connecting, the handshake and the query can each take
     # one full timeout, so 3 x 3s at worst.

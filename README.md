@@ -37,8 +37,9 @@ If you pass `--queuelength-interval=x` (any x > 0), the queue lengths are read f
 
 * `celery_queue_length{queue="..."}`, gauge
 
-While the broker cannot be reached, `celery_queue_length` is left out instead of keeping its last value.
-So an alert like `celery_queue_length > 100` silently stops firing; add one that fires when the metric is missing.
+While the broker cannot be reached, `celery_queue_length` is left out.
+So an alert like `celery_queue_length > 100` silently stops firing;
+add one that fires when the metric is missing.
 With a single exporter per alert selector, `absent()` does that:
 
 ```yaml
@@ -48,8 +49,10 @@ With a single exporter per alert selector, `absent()` does that:
 ```
 
 `absent()` only fires if *no* series matches the selector at all.
-If the selector covers several exporters (e.g. one per broker), one of them failing goes unnoticed as long as another still reports.
-Compare against the `up` series Prometheus records for each scrape target instead, which yields one alert per exporter that is down or cannot read its broker:
+If the selector covers several exporters (e.g. one per broker), 
+one of them failing goes unnoticed as long as another still reports.
+Compare against the `up` series Prometheus records for each scrape target instead, 
+which yields one alert per exporter that is down or cannot read its broker:
 
 ```yaml
 - alert: CeleryQueueLengthMissing
@@ -57,10 +60,8 @@ Compare against the `up` series Prometheus records for each scrape target instea
   for: 5m
 ```
 
-The `up` selector must match only exporters started with `--queuelength-interval`, and `on(...)` must name labels that identify the exporter on both sides.
-
-Reading gives up after 3 seconds; set `socket_timeout`/`socket_connect_timeout` in `broker_transport_options` to change that.
-
+The `up` selector must match only exporters started with `--queuelength-interval`, and `on(...)`
+must name labels that identify the exporter on both sides.
 
 ## Run tests
 
