@@ -73,9 +73,9 @@ def unacked(queue):
 
 def scrape(registry):
     return {
-        (x.name, tuple(x.labels.values())): x.value
+        (sample.name, tuple(sample.labels.values())): sample.value
         for metric in registry.collect()
-        for x in metric.samples
+        for sample in metric.samples
     }
 
 
