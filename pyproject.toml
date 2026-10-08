@@ -1,12 +1,12 @@
 [project]
 name = "celery_redis_prometheus"
 description = "Exports task execution metrics in Prometheus format"
-version = "1.6.0.dev0"
+version = "2.0.0.dev0"
 
 dependencies = [
     "celery >= 5.0.0.dev0",
     "click",
-    "prometheus_client",
+    "prometheus_client >= 0.14.0",
 ]
 
 authors = [{name="DIE ZEIT", email="engineering@zeit.de"}]

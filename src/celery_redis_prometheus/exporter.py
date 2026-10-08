@@ -1,14 +1,14 @@
 from functools import wraps
-import _thread
 import collections
 import json
 import logging
-import threading
 import time
 
 import celery.bin.base
 import click
 import prometheus_client
+import prometheus_client.core
+import prometheus_client.registry
 
 
 log = logging.getLogger(__name__)
@@ -21,6 +21,10 @@ prometheus_client.REGISTRY.unregister(prometheus_client.PLATFORM_COLLECTOR)
 prometheus_client.REGISTRY.unregister(prometheus_client.PROCESS_COLLECTOR)
 
 
+# Creating a metric registers it with prometheus_client's default REGISTRY,
+# which the HTTP server started in main() renders on each request. These will
+# be updated later by processing Celery events and the next scrape will
+# pick up the new values.
 STATS = {
     'tasks': prometheus_client.Counter('celery_tasks_total', 'Number of tasks', ['queue', 'state']),
     'queuetime': prometheus_client.Histogram(
@@ -29,7 +33,6 @@ STATS = {
     'runtime': prometheus_client.Histogram(
         'celery_task_runtime_seconds', 'Task runtime', ['queue']
     ),
-    'queues': prometheus_client.Gauge('celery_queue_length', 'Queue length', ['queue']),
 }
 
 
@@ -37,46 +40,30 @@ STATS = {
 @click.option('--host', default='0.0.0.0', help='Listen host')
 @click.option('--port', default=9691, help='Listen port')
 @click.option(
-    '--queuelength-interval', default=0, help='Check queue lengths every x seconds (0=disabled)'
+    '--queue-length',
+    is_flag=True,
+    help='Export queue lengths, read from the broker on each scrape (redis only)',
 )
 @click.option('--verbose', is_flag=True, help='Enable debug logging')
 @click.pass_context
-def main(ctx, host, port, queuelength_interval, verbose):
+def main(ctx, host, port, queue_length, verbose):
     app = ctx.obj.app
     app.log.setup(logging.DEBUG if verbose else logging.INFO)
 
-    queuelength_thread = None
-    if queuelength_interval:
-        queuelength_thread = QueueLengthMonitor(app, queuelength_interval)
-        queuelength_thread.start()
+    if queue_length:
+        prometheus_client.REGISTRY.register(QueueLengthCollector(app))
 
-    receiver = CeleryEventReceiver(app)
+    # Serves REGISTRY from a daemon thread.
     prometheus_client.start_http_server(port, host)
     log.info('Listening on %s:%s', host, port)
 
-    try_interval = 1
-    while True:
-        try:
-            try_interval *= 2
-            receiver()
-            try_interval = 1
-        except (KeyboardInterrupt, SystemExit):
-            log.info('Exiting')
-            if queuelength_thread:
-                queuelength_thread.stop()
-            _thread.interrupt_main()
-            break
-        except Exception as e:
-            log.error(
-                'Failed to capture events: "%s", trying again in %s seconds.',
-                e,
-                try_interval,
-                exc_info=True,
-            )
-            time.sleep(try_interval)
+    CeleryEventReceiver(app).run_forever()
 
 
 def task_handler(fn):
+    """Wrapper to first apply the event, get the relevant task and forward
+    to the relevant handler."""
+
     @wraps(fn)
     def wrapper(self, event):
         self.state.event(event)
@@ -87,6 +74,19 @@ def task_handler(fn):
 
 
 class CeleryEventReceiver:
+    """Turns the Celery event stream into the metrics in STATS.
+
+    Workers publish an event to the broker for each task state change, if
+    they are started with `-E` (or `worker_send_task_events`). We subscribe
+    to these and record them in a `celery.events.State`, which collects the
+    events of each task. The handlers only update the metrics, Prometheus
+    picks up their current values on its next scrape.
+
+    This goes against the recommended Prometheus pattern of "observe on scrape",
+    but we can't really collect the Celery task metrics without keeping state.
+    Redis metrics can be collected on scrape, QueueLengthCollector implements that.
+    """
+
     def __init__(self, app):
         self.app = app
 
@@ -123,7 +123,26 @@ class CeleryEventReceiver:
         STATS['tasks'].labels(task.routing_key, 'retried').inc()
         self.record_runtime(task)
 
-    def __call__(self, *args, **kw):
+    def run_forever(self):
+        try_interval = 1
+        while True:
+            try:
+                try_interval *= 2
+                self.capture()
+                try_interval = 1
+            except (KeyboardInterrupt, SystemExit):
+                log.info('Exiting')
+                break
+            except Exception as e:
+                log.error(
+                    'Failed to capture events: "%s", trying again in %s seconds.',
+                    e,
+                    try_interval,
+                    exc_info=True,
+                )
+                time.sleep(try_interval)
+
+    def capture(self, *args, **kw):
         self.state = self.app.events.State()
         kw.setdefault('wakeup', False)
 
@@ -141,43 +160,65 @@ class CeleryEventReceiver:
             recv.capture(*args, **kw)
 
 
-class QueueLengthMonitor(threading.Thread):
-    def __init__(self, app, interval):
-        super().__init__()
+class QueueLengthCollector(prometheus_client.registry.Collector):
+    """
+    Reads the queue lengths from Redis and exposes them on each scrape.
+    This is a separate collector because we don't need to keep Celery state
+    and we want to be able to tell if the broker is down.
+    """
+
+    # By default, the broker connection waits forever for a Redis that stops
+    # answering, but we have to respond within the Prometheus scrape timeout
+    # (10s by default). Connecting, the handshake and the query can each take
+    # one full timeout, so 3 x 3s at worst.
+    TRANSPORT_OPTIONS = {'socket_timeout': 3, 'socket_connect_timeout': 3}
+
+    def __init__(self, app):
         self.app = app
-        self.interval = interval
-        self.running = True
 
-    def run(self):
-        while self.running:
-            try:
-                lengths = collections.Counter()
+    # Without describe(), register() would call collect() and thus hit redis.
+    def describe(self):
+        yield self._lengths_metric()
 
-                with self.app.connection() as connection:
-                    pipe = connection.channel().client.pipeline(transaction=False)
-                    for queue in self.app.conf['task_queues']:
-                        # Not claimed by any worker yet
-                        pipe.llen(queue.name)
-                    # Claimed by worker but not acked/processed yet
-                    pipe.hvals('unacked')
+    def collect(self):
+        try:
+            lengths = self.queue_lengths()
+        except Exception:
+            log.error('Failed to read queue lengths', exc_info=True)
+            return
+        metric = self._lengths_metric()
+        for queue, length in lengths.items():
+            metric.add_metric([queue], length)
+        yield metric
 
-                    result = pipe.execute()
+    def queue_lengths(self):
+        # Celery puts the options passed here over `broker_transport_options`,
+        # so merge ours underneath to let the configured ones win.
+        options = dict(
+            self.TRANSPORT_OPTIONS, **self.app.conf.get('broker_transport_options') or {}
+        )
+        queues = self.app.conf['task_queues']
+        with self.app.connection(transport_options=options) as connection:
+            # channel() would otherwise connect with one retry after sleeping 2s,
+            # which doubles the time we hang on an unresponsive broker.
+            connection.ensure_connection(max_retries=0)
+            pipe = connection.channel().client.pipeline(transaction=False)
+            for queue in queues:
+                # Not claimed by any worker yet
+                pipe.llen(queue.name)
+            # Claimed by worker but not acked/processed yet
+            pipe.hvals('unacked')
+            result = pipe.execute()
 
-                unacked = result.pop()
-                for task in unacked:
-                    data = json.loads(task.decode('utf-8'))
-                    queue = data[-1]
-                    lengths[queue] += 1
+        lengths = collections.Counter()
+        for task in result.pop():
+            data = json.loads(task.decode('utf-8'))
+            lengths[data[-1]] += 1
+        for llen, queue in zip(result, queues):
+            lengths[queue.name] += llen
+        return lengths
 
-                for llen, queue in zip(result, self.app.conf['task_queues']):
-                    lengths[queue.name] += llen
-
-                for queue, length in lengths.items():
-                    STATS['queues'].labels(queue).set(length)
-
-                time.sleep(self.interval)
-            except Exception:
-                log.error('Uncaught exception, preventing thread from crashing.', exc_info=True)
-
-    def stop(self):
-        self.running = False
+    def _lengths_metric(self):
+        return prometheus_client.core.GaugeMetricFamily(
+            'celery_queue_length', 'Queue length', labels=['queue']
+        )

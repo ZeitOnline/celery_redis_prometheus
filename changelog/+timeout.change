@@ -1,0 +1,1 @@
+Give up reading queue lengths on a hanging broker after 3 seconds per connect, handshake and query (so about 9 seconds at worst), to still answer within the default 10 second scrape timeout. Configurable via `socket_timeout`/`socket_connect_timeout` in `broker_transport_options`
