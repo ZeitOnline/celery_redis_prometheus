@@ -2,7 +2,7 @@
 
 <!-- towncrier release notes start -->
 
-## 1.6.0 (unreleased)
+## 2.0.0 (unreleased)
 
 - Nothing changed yet.
 

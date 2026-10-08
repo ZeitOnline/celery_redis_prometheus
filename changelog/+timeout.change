@@ -1,0 +1,1 @@
+Give up reading queue lengths after 3 seconds on a hanging broker, so the scrape still answers in time. Configurable via `socket_timeout`/`socket_connect_timeout` in `broker_transport_options`
