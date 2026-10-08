@@ -62,9 +62,8 @@ def main(ctx, host, port, queuelength_interval, verbose):
 
 
 def task_handler(fn):
-    """Applies the event to the tracked state first, and passes the task it
-    belongs to, so handlers see what earlier events said about it (e.g. its
-    queue, or when it was sent)."""
+    """Wrapper to first apply the event, get the relevant task and forward
+    to the relevant handler."""
 
     @wraps(fn)
     def wrapper(self, event):

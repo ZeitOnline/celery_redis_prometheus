@@ -61,7 +61,7 @@ def broken_app(**conf):
     return app
 
 
-def queue_metrics(app):
+def registry_with_queue_metrics(app):
     registry = prometheus_client.CollectorRegistry(auto_describe=True)
     registry.register(celery_redis_prometheus.exporter.QueueLengthCollector(app))
     return registry
@@ -81,7 +81,7 @@ def scrape(registry):
 
 def test_adds_unacked_tasks_to_queue_length():
     app = redis_app([3, 0, [unacked('default'), unacked('default')]])
-    assert scrape(queue_metrics(app)) == {
+    assert scrape(registry_with_queue_metrics(app)) == {
         ('celery_queue_length', ('default',)): 5,
         ('celery_queue_length', ('other',)): 0,
     }
@@ -89,7 +89,7 @@ def test_adds_unacked_tasks_to_queue_length():
 
 def test_reads_queue_lengths_on_each_scrape_only():
     app = redis_app([1, 0, []], [2, 0, []])
-    registry = queue_metrics(app)
+    registry = registry_with_queue_metrics(app)
     app.connection.assert_not_called()
 
     assert registry.get_sample_value('celery_queue_length', {'queue': 'default'}) == 1
@@ -97,21 +97,21 @@ def test_reads_queue_lengths_on_each_scrape_only():
 
 
 def test_failed_read_leaves_out_queue_lengths():
-    assert scrape(queue_metrics(broken_app())) == {}
+    assert scrape(registry_with_queue_metrics(broken_app())) == {}
 
 
 def test_recovers_after_failed_read():
     app = redis_app([1, 0, []])
-    registry = queue_metrics(app)
+    registry = registry_with_queue_metrics(app)
     app.connection.side_effect = [ConnectionError('broker down'), app.connection.return_value]
 
     assert registry.get_sample_value('celery_queue_length', {'queue': 'default'}) is None
     assert registry.get_sample_value('celery_queue_length', {'queue': 'default'}) == 1
 
 
-def test_times_out_on_hanging_broker_by_default():
+def test_socket_configuration_set_by_default():
     app = broken_app()
-    scrape(queue_metrics(app))
+    scrape(registry_with_queue_metrics(app))
 
     options = app.connection.call_args.kwargs['transport_options']
     assert options == {'socket_timeout': 3, 'socket_connect_timeout': 3}
@@ -119,7 +119,7 @@ def test_times_out_on_hanging_broker_by_default():
 
 def test_does_not_retry_connecting():
     app = redis_app([1, 0, []])
-    scrape(queue_metrics(app))
+    scrape(registry_with_queue_metrics(app))
 
     connection = app.connection.return_value
     connection.ensure_connection.assert_called_once_with(max_retries=0)
@@ -127,13 +127,13 @@ def test_does_not_retry_connecting():
 
 def test_configured_transport_options_override_default_timeout():
     app = broken_app(broker_transport_options={'socket_timeout': 2})
-    scrape(queue_metrics(app))
+    scrape(registry_with_queue_metrics(app))
 
     options = app.connection.call_args.kwargs['transport_options']
     assert options == {'socket_timeout': 2, 'socket_connect_timeout': 3}
 
 
-def test_broker_outage_keeps_task_metrics_on_the_same_endpoint():
+def test_broker_outage_does_not_impact_task_metrics():
     collector = celery_redis_prometheus.exporter.QueueLengthCollector(broken_app())
     # main() registers on the global registry, next to the event metrics.
     registry = prometheus_client.REGISTRY
