@@ -40,18 +40,17 @@ STATS = {
 @click.option('--host', default='0.0.0.0', help='Listen host')
 @click.option('--port', default=9691, help='Listen port')
 @click.option(
-    '--queuelength-interval',
-    default=0,
-    help='Export queue lengths if > 0 (0=disabled). They are read on each scrape, '
-    'the value itself is only kept for compatibility.',
+    '--queue-length',
+    is_flag=True,
+    help='Export queue lengths, read from the broker on each scrape (redis only)',
 )
 @click.option('--verbose', is_flag=True, help='Enable debug logging')
 @click.pass_context
-def main(ctx, host, port, queuelength_interval, verbose):
+def main(ctx, host, port, queue_length, verbose):
     app = ctx.obj.app
     app.log.setup(logging.DEBUG if verbose else logging.INFO)
 
-    if queuelength_interval:
+    if queue_length:
         prometheus_client.REGISTRY.register(QueueLengthCollector(app))
 
     # Serves REGISTRY from a daemon thread.

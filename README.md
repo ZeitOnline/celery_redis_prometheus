@@ -33,7 +33,7 @@ We export the following metrics:
 * `celery_task_queuetime_seconds{queue}`, histogram (only if `task_send_sent_event` is enabled in Celery)
 * `celery_task_runtime_seconds{queue}`, histogram
 
-If you pass `--queuelength-interval=x` (any x > 0), the queue lengths are read from the broker on each scrape (NOTE: this only works with redis as the broker), resulting in this additional metric:
+If you pass `--queue-length`, the queue lengths are read from the broker on each scrape (NOTE: this only works with redis as the broker), resulting in this additional metric:
 
 * `celery_queue_length{queue="..."}`, gauge
 
@@ -60,7 +60,7 @@ which yields one alert per exporter that is down or cannot read its broker:
   for: 5m
 ```
 
-The `up` selector must match only exporters started with `--queuelength-interval`, and `on(...)`
+The `up` selector must match only exporters started with `--queue-length`, and `on(...)`
 must name labels that identify the exporter on both sides.
 
 ## Run tests
