@@ -1,0 +1,1 @@
+Read queue lengths from the broker on each scrape instead of polling them in a background thread. While the broker cannot be reached, `celery_queue_length` is left out instead of keeping stale values; see the README on how to alert on that
