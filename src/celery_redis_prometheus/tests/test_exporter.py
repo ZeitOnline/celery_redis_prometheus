@@ -133,10 +133,16 @@ def test_configured_transport_options_override_default_timeout():
     assert options == {'socket_timeout': 2, 'socket_connect_timeout': 3}
 
 
+def test_does_not_export_metrics_about_exporter_process():
+    names = {metric.name for metric in celery_redis_prometheus.exporter.REGISTRY.collect()}
+    assert not [x for x in names if x.startswith(('process_', 'python_'))]
+    assert 'celery_tasks' in names
+
+
 def test_broker_outage_does_not_impact_task_metrics():
     collector = celery_redis_prometheus.exporter.QueueLengthCollector(broken_app())
-    # main() registers on the global registry, next to the event metrics.
-    registry = prometheus_client.REGISTRY
+    # main() registers on the exporter's registry, next to the event metrics.
+    registry = celery_redis_prometheus.exporter.REGISTRY
     registry.register(collector)
     try:
         STATS = celery_redis_prometheus.exporter.STATS

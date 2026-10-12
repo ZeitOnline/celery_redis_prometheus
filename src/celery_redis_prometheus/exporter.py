@@ -14,24 +14,24 @@ import prometheus_client.registry
 log = logging.getLogger(__name__)
 
 
-# Remove any `process_` and `python_` metrics, since we're proxying for the
-# whole celery machinery, but those would only be about this process.
-prometheus_client.REGISTRY.unregister(prometheus_client.GC_COLLECTOR)
-prometheus_client.REGISTRY.unregister(prometheus_client.PLATFORM_COLLECTOR)
-prometheus_client.REGISTRY.unregister(prometheus_client.PROCESS_COLLECTOR)
+# Our own registry instead of prometheus_client's default one, so we don't
+# export its `process_` and `python_` metrics: we're proxying for the whole
+# celery machinery, but those would only be about this process.
+REGISTRY = prometheus_client.CollectorRegistry()
 
 
-# Creating a metric registers it with prometheus_client's default REGISTRY,
-# which the HTTP server started in main() renders on each request. These will
-# be updated later by processing Celery events and the next scrape will
-# pick up the new values.
+# These are rendered by the HTTP server started in main() on each request.
+# They will be updated later by processing Celery events and the next scrape
+# will pick up the new values.
 STATS = {
-    'tasks': prometheus_client.Counter('celery_tasks_total', 'Number of tasks', ['queue', 'state']),
+    'tasks': prometheus_client.Counter(
+        'celery_tasks_total', 'Number of tasks', ['queue', 'state'], registry=REGISTRY
+    ),
     'queuetime': prometheus_client.Histogram(
-        'celery_task_queuetime_seconds', 'Task queue wait time', ['queue']
+        'celery_task_queuetime_seconds', 'Task queue wait time', ['queue'], registry=REGISTRY
     ),
     'runtime': prometheus_client.Histogram(
-        'celery_task_runtime_seconds', 'Task runtime', ['queue']
+        'celery_task_runtime_seconds', 'Task runtime', ['queue'], registry=REGISTRY
     ),
 }
 
@@ -51,10 +51,10 @@ def main(ctx, host, port, queue_length, verbose):
     app.log.setup(logging.DEBUG if verbose else logging.INFO)
 
     if queue_length:
-        prometheus_client.REGISTRY.register(QueueLengthCollector(app))
+        REGISTRY.register(QueueLengthCollector(app))
 
     # Serves REGISTRY from a daemon thread.
-    prometheus_client.start_http_server(port, host)
+    prometheus_client.start_http_server(port, host, registry=REGISTRY)
     log.info('Listening on %s:%s', host, port)
 
     CeleryEventReceiver(app).run_forever()
