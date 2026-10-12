@@ -1,1 +1,0 @@
-Replace `--queuelength-interval=x` with the flag `--queue-length`. The old option is rejected, so update the exporter arguments when upgrading

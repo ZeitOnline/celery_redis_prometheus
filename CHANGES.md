@@ -2,6 +2,15 @@
 
 <!-- towncrier release notes start -->
 
+## 2.0.0 (2026-10-12)
+
+### 
+
+- Give up reading queue lengths on a hanging broker after 3 seconds per connect, handshake and query (so about 9 seconds at worst), to still answer within the default 10 second scrape timeout. Configurable via `socket_timeout`/`socket_connect_timeout` in `broker_transport_options`
+- Read queue lengths from the broker on each scrape instead of polling them in a background thread. While the broker cannot be reached, `celery_queue_length` is left out instead of keeping stale values; see the README on how to alert on that
+- Replace `--queuelength-interval=x` with the flag `--queue-length`. The old option is rejected, so update the exporter arguments when upgrading
+
+
 ## 2.0.0 (unreleased)
 
 - Nothing changed yet.
