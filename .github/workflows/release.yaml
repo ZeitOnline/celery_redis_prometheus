@@ -7,8 +7,7 @@ on:
 
 jobs:
   release:
-    # TODO: pin to the gh-action-workflows release that contains pypi-release
-    uses: zeitonline/gh-action-workflows/.github/workflows/pypi-release.yaml@0167ccffbb2ff3c0b3a53a2205f10a85007ff73e
+    uses: zeitonline/gh-action-workflows/.github/workflows/pypi-release.yaml@a07f66af60d78de3727d1a6ba78d3bb027b627df # 4.8.0
     permissions:
       contents: write
       pull-requests: write
