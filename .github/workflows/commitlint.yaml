@@ -1,0 +1,12 @@
+name: Commit lint
+
+# Release Please only releases fix, feat and deps commits,
+# so other messages would silently skip a release
+on:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  commitlint:
+    uses: zeitonline/gh-action-workflows/.github/workflows/commit-lint.yaml@7c0cccffb89e545f3c37312433c7810432107003 # 4.7.3
