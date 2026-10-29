@@ -1,66 +1,16 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "bootstrap-sha": "3a859ed8dc5611d607291a4c0e9e7161a5ad4718",
-  "packages": {
-    ".": {
-      "release-type": "python",
-      "include-v-in-tag": false,
-      "changelog-path": "CHANGES.md",
-      "changelog-sections": [
-        {
-          "type": "feat",
-          "section": "Features"
-        },
-        {
-          "type": "fix",
-          "section": "Bug Fixes"
-        },
-        {
-          "type": "perf",
-          "section": "Performance Improvements"
-        },
-        {
-          "type": "deps",
-          "section": "Dependencies"
-        },
-        {
-          "type": "revert",
-          "section": "Reverts"
-        },
-        {
-          "type": "docs",
-          "section": "Documentation"
-        },
-        {
-          "type": "chore",
-          "section": "Maintenance"
-        },
-        {
-          "type": "ci",
-          "section": "Continuous Integration",
-          "hidden": true
-        },
-        {
-          "type": "build",
-          "section": "Build System",
-          "hidden": true
-        },
-        {
-          "type": "refactor",
-          "section": "Code Refactoring",
-          "hidden": true
-        },
-        {
-          "type": "test",
-          "section": "Tests",
-          "hidden": true
-        },
-        {
-          "type": "style",
-          "section": "Styles",
-          "hidden": true
-        }
-      ]
-    }
-  }
+  "release-type": "python",
+  "include-v-in-tag": false,
+  "changelog-path": "CHANGES.md",
+  "changelog-sections": [
+    {"type": "feat", "section": "Features"},
+    {"type": "fix", "section": "Bug Fixes"},
+    {"type": "perf", "section": "Performance Improvements"},
+    {"type": "deps", "section": "Dependencies"},
+    {"type": "revert", "section": "Reverts"},
+    {"type": "docs", "section": "Documentation"},
+    {"type": "chore", "section": "Maintenance"}
+  ],
+  "packages": {".": {}}
 }
