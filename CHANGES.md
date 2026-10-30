@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/ZeitOnline/celery_redis_prometheus/compare/2.0.1...2.0.2) (2026-10-30)
+
+
+### Maintenance
+
+* **deps:** lock file maintenance (uv) ([#17](https://github.com/ZeitOnline/celery_redis_prometheus/issues/17)) ([50b5282](https://github.com/ZeitOnline/celery_redis_prometheus/commit/50b5282179b5286b1bfb6de659a2587990eedef0))
+
 ## [2.0.1](https://github.com/ZeitOnline/celery_redis_prometheus/compare/2.0.0...2.0.1) (2026-10-29)
 
 
