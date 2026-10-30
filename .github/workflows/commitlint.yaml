@@ -1,7 +1,7 @@
 name: Commit lint
 
-# Release Please only releases fix, feat and deps commits,
-# so other messages would silently skip a release
+# Release Please derives version and changelog from conventional commits
+# and silently leaves out any other message
 on:
   push:
     branches-ignore:
