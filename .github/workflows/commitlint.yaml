@@ -9,4 +9,4 @@ on:
 
 jobs:
   commitlint:
-    uses: zeitonline/gh-action-workflows/.github/workflows/commit-lint.yaml@7c0cccffb89e545f3c37312433c7810432107003 # 4.7.3
+    uses: zeitonline/gh-action-workflows/.github/workflows/commit-lint.yaml@288ab646a50fe77f7cf19c3bcd209543fed46982 # 4.9.0
