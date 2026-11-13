@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.0.2](https://github.com/ZeitOnline/celery_redis_prometheus/compare/2.0.1...2.0.2) (2026-11-13)
+
+
+### Maintenance
+
+* **deps:** lock file maintenance (uv) ([#17](https://github.com/ZeitOnline/celery_redis_prometheus/issues/17)) ([50b5282](https://github.com/ZeitOnline/celery_redis_prometheus/commit/50b5282179b5286b1bfb6de659a2587990eedef0))
+* **deps:** lock file maintenance (uv) ([#22](https://github.com/ZeitOnline/celery_redis_prometheus/issues/22)) ([b954d99](https://github.com/ZeitOnline/celery_redis_prometheus/commit/b954d99d3c701127576fbb63f1d6b3d39615b0e2))
+* **deps:** lock file maintenance (uv) ([#23](https://github.com/ZeitOnline/celery_redis_prometheus/issues/23)) ([2f39e8a](https://github.com/ZeitOnline/celery_redis_prometheus/commit/2f39e8a14fdf41f0a0d57582f253edaf2c122c89))
+* **deps:** lock file maintenance (uv) ([#24](https://github.com/ZeitOnline/celery_redis_prometheus/issues/24)) ([76def0b](https://github.com/ZeitOnline/celery_redis_prometheus/commit/76def0b41bad1c52050d1c585afcda08df3adfda))
+* **deps:** lock file maintenance (uv) ([#25](https://github.com/ZeitOnline/celery_redis_prometheus/issues/25)) ([faacaeb](https://github.com/ZeitOnline/celery_redis_prometheus/commit/faacaeb9c641fb9f3257addf86fd15dcdeb392c5))
+* **deps:** lock file maintenance (uv) ([#26](https://github.com/ZeitOnline/celery_redis_prometheus/issues/26)) ([0b2655f](https://github.com/ZeitOnline/celery_redis_prometheus/commit/0b2655f8b04b6bac30929904afdc68f22faecb53))
+* **deps:** lock file maintenance (uv) ([#27](https://github.com/ZeitOnline/celery_redis_prometheus/issues/27)) ([1a88091](https://github.com/ZeitOnline/celery_redis_prometheus/commit/1a8809119d5db9fd715da1c98ee264be2b6abbc2))
+* **deps:** update actions/setup-python action to v7.1.0 ([#20](https://github.com/ZeitOnline/celery_redis_prometheus/issues/20)) ([ef9bcbf](https://github.com/ZeitOnline/celery_redis_prometheus/commit/ef9bcbf92b1f1e5bcde09e643f78b0f2e609c6e3))
+* **deps:** update zeitonline/gh-action-workflows action to 4.9.0 ([#21](https://github.com/ZeitOnline/celery_redis_prometheus/issues/21)) ([9382ab8](https://github.com/ZeitOnline/celery_redis_prometheus/commit/9382ab852a0b1ce5ba11252c9784aceebab56dc4))
+
 ## [2.0.1](https://github.com/ZeitOnline/celery_redis_prometheus/compare/2.0.0...2.0.1) (2026-10-29)
 
 
