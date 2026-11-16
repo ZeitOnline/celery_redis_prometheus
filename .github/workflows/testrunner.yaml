@@ -5,7 +5,7 @@ on:
 
 jobs:
   lint:
-    uses: zeitonline/gh-action-workflows/.github/workflows/lefthook.yaml@288ab646a50fe77f7cf19c3bcd209543fed46982 # 4.9.0
+    uses: zeitonline/gh-action-workflows/.github/workflows/lefthook.yaml@b19340fe2799d806acba988c59a2213eb3771971 # 4.10.1
     with:
       python-version: "3.14"
       setup-command: bin/build lefthook
